@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2016
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ROP", "ROP\ROP.fsproj", "{9E3BC464-7B59-4ECD-9C5F-E43F94F3CF60}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "ROP.Tests", "ROP.Tests\ROP.Tests.fsproj", "{19D94C90-184D-4954-9DF1-0643038A194A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9E3BC464-7B59-4ECD-9C5F-E43F94F3CF60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E3BC464-7B59-4ECD-9C5F-E43F94F3CF60}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E3BC464-7B59-4ECD-9C5F-E43F94F3CF60}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E3BC464-7B59-4ECD-9C5F-E43F94F3CF60}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19D94C90-184D-4954-9DF1-0643038A194A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19D94C90-184D-4954-9DF1-0643038A194A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19D94C90-184D-4954-9DF1-0643038A194A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19D94C90-184D-4954-9DF1-0643038A194A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8200C4B7-B342-44C5-A73B-FF4AE2FC6CC3}
+	EndGlobalSection
+EndGlobal

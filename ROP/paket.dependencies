@@ -1,0 +1,9 @@
+source https://www.nuget.org/api/v2
+framework: netstandard20
+
+group Test
+source https://www.nuget.org/api/v2
+framework: netstandard20, netcore21
+
+nuget Expecto
+nuget Expecto.FsCheck
