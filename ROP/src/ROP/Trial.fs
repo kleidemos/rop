@@ -263,7 +263,7 @@ module Trial =
         | Some p -> pass p 
         | None -> fail error
 
-    // TODO: Порядок аргументов?
+    // TODO: РџРѕСЂСЏРґРѕРє Р°СЂРіСѓРјРµРЅС‚РѕРІ?
     let tryIfNone warn ifNone option =
         match option with
         | Some p -> pass p
@@ -280,7 +280,7 @@ module Trial =
         | Ok success -> pass success
         | Error error -> fail error
 
-    // TODO: Тащить варнинги?
+    // TODO: РўР°С‰РёС‚СЊ РІР°СЂРЅРёРЅРіРё?
     let apply f trial = 
         map2 (fun f trial -> f trial) f trial
 
@@ -292,7 +292,7 @@ module Trial =
         map2 action trial1 trial2 
         |> ignore
 
-    /// Крайне спорное API. 
+    /// РљСЂР°Р№РЅРµ СЃРїРѕСЂРЅРѕРµ API. 
     module Distincted =
         type Distinction<'a, 'b> = 
             | Distint
@@ -383,7 +383,7 @@ type Trial<'result, 'warning, 'error> with
     member this.IsFail = 
         Trial.isFail this
 
-// Почти чистая копипаста.
+// РџРѕС‡С‚Рё С‡РёСЃС‚Р°СЏ РєРѕРїРёРїР°СЃС‚Р°.
 [<AutoOpen>]
 module TrialBuilder = 
     open System
