@@ -71,6 +71,27 @@ module Trial =
                 yield test L.fail Trial.failsWithWarnings Choice2.shouldConvert2Of2
             ]
 
+            testList "map result apart" [
+                testProperty L.pow <| fun success warnings -> 
+                    Trial.warns warnings success
+                    |> Trial.mapResultApart 
+                        hash
+                        shouldNotCallT
+                    |> Expect.equal "" (
+                        hash success
+                        |> Trial.warns warnings)
+
+                testProperty L.fail <| fun errors warnings -> 
+                    Trial.failsWithWarnings warnings errors 
+                    |> Trial.mapResultApart
+                        shouldNotCallT
+                        (List.map hash)
+                    |> Expect.equal "" (
+                        errors
+                        |> List.map hash 
+                        |> Trial.failsWithWarnings warnings)
+            ]
+
             testList "map (success)" [
                 testProperty L.pow <| fun success warnings -> 
                     Trial.warns warnings success

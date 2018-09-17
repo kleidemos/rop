@@ -110,6 +110,14 @@ module Trial =
         Warnings = trial.Warnings
     }
 
+    let mapResultApart successMapping failureMapping trial = {
+        Result = 
+            match trial.Result with
+            | Choice1Of2 p -> successMapping p |> Choice1Of2
+            | Choice2Of2 p -> failureMapping p |> Choice2Of2
+        Warnings = trial.Warnings
+    }
+
     let map mapping trial = 
         mapResult (ChoiceOf2.map mapping) trial
 
@@ -137,6 +145,8 @@ module Trial =
         | Warn (p, warns) -> warns, Choice1Of2 p
         | Fail (errors, warns) -> warns, Choice2Of2 errors 
         ||> fun warns -> create (warns @ trial.Warnings)
+
+    //let bindResultApart if
 
     let bind binding trial = 
         trial
