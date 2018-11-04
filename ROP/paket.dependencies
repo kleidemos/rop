@@ -1,6 +1,9 @@
 source https://www.nuget.org/api/v2
 framework: netstandard20
 
+nuget Hopac
+nuget TaskBuilder.fs
+
 group Test
 source https://www.nuget.org/api/v2
 framework: netstandard20, netcore21
