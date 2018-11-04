@@ -85,29 +85,33 @@ module Trial =
         Warnings = warnings
     }
 
-    let warns warns success = 
+    let createSuccess warns success = 
         TrialResult.Success success
         |> create warns 
 
     let pass success = 
-        warns [] success
+        createSuccess [] success
 
     /// Alias of `pass`.
     let ok success = 
         pass success 
 
-    let warn message success = 
-        warns [message] success
+    /// Alias of `createSuccess`.
+    let warnAll messages success =
+        createSuccess messages success
 
-    let failsWithWarnings warnings errors = 
+    let warn message success = 
+        createSuccess [message] success
+
+    let createFailure warnings errors = 
         TrialResult.Errors errors
         |> create warnings 
 
-    let fails errors = 
-        failsWithWarnings [] errors 
+    let failAll errors = 
+        createFailure [] errors 
 
     let fail error = 
-        fails [error]
+        failAll [error]
 
     // Map and bind
 
@@ -232,8 +236,8 @@ module Trial =
     let warningsToErrors trial = 
         match trial with
         | Pass _ -> trial
-        | Warn (_, warns) -> failsWithWarnings [] warns
-        | Fail (errors, warns) -> failsWithWarnings [] (warns @ errors)
+        | Warn (_, warns) -> createFailure [] warns
+        | Fail (errors, warns) -> createFailure [] (warns @ errors)
 
     let defaultSuccess ifFailure trial = 
         trial
@@ -249,9 +253,9 @@ module Trial =
         | Failure (oldErrors, oldWarnings) -> 
             match ifFailureThunk () with
             | Success (success, newWarnings) -> 
-                warns (newWarnings @ oldWarnings) success
+                createSuccess (newWarnings @ oldWarnings) success
             | Failure (newErrors, newWarnings) -> 
-                failsWithWarnings 
+                createFailure 
                     (newWarnings @ oldWarnings)
                     (newErrors @ oldErrors)
 
@@ -448,9 +452,9 @@ module AsyncTrial =
         match trial with
         | Trial.Success (preSuccess, warnings) -> 
             let! success = preSuccess
-            return Trial.warns warnings success
+            return Trial.createSuccess warnings success
         | Trial.Failure (errors, warnings) -> 
-            return Trial.failsWithWarnings warnings errors
+            return Trial.createFailure warnings errors
     }
 
     let bind binding (T trial) : AsyncTrial<_,_,_> = async {

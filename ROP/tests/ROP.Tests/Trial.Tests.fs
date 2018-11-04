@@ -59,64 +59,64 @@ module Trial =
                     testList (sprintf "%s -> " sourceName) [
                         yield test
                             L.pow
-                            Trial.warns
+                            Trial.createSuccess
                             TrialResult.Success
                         yield test
                             L.fail
-                            Trial.failsWithWarnings
+                            Trial.createFailure
                             TrialResult.Errors        
                     ]
 
-                yield test L.pow Trial.warns TrialResult.shouldConvertSuccess
-                yield test L.fail Trial.failsWithWarnings TrialResult.shouldConvertFailure
+                yield test L.pow Trial.createSuccess TrialResult.shouldConvertSuccess
+                yield test L.fail Trial.createFailure TrialResult.shouldConvertFailure
             ]
 
             testList "map result apart" [
                 testProperty L.pow <| fun success warnings -> 
-                    Trial.warns warnings success
+                    Trial.createSuccess warnings success
                     |> Trial.mapResultApart 
                         hash
                         shouldNotCallT
                     |> Expect.equal "" (
                         hash success
-                        |> Trial.warns warnings)
+                        |> Trial.createSuccess warnings)
 
                 testProperty L.fail <| fun errors warnings -> 
-                    Trial.failsWithWarnings warnings errors 
+                    Trial.createFailure warnings errors 
                     |> Trial.mapResultApart
                         shouldNotCallT
                         (List.map hash)
                     |> Expect.equal "" (
                         errors
                         |> List.map hash 
-                        |> Trial.failsWithWarnings warnings)
+                        |> Trial.createFailure warnings)
             ]
 
             testList "map (success)" [
                 testProperty L.pow <| fun success warnings -> 
-                    Trial.warns warnings success
+                    Trial.createSuccess warnings success
                     |> Trial.map (string >> List.singleton)
-                    |> Expect.equal "" (Trial.warns warnings [string success])
+                    |> Expect.equal "" (Trial.createSuccess warnings [string success])
 
                 testProperty L.fail <| fun errors warnings -> 
-                    Trial.failsWithWarnings warnings errors 
+                    Trial.createFailure warnings errors 
                     |> Trial.map (string >> List.singleton)
-                    |> Expect.equal "" (Trial.failsWithWarnings warnings errors)
+                    |> Expect.equal "" (Trial.createFailure warnings errors)
             ]
 
             testList "map errors" [
                 testProperty L.pow <| fun success warnings -> 
-                    Trial.warns warnings success 
+                    Trial.createSuccess warnings success 
                     |> Trial.mapErrors (List.map string)
-                    |> Expect.equal "" (Trial.warns warnings success)
+                    |> Expect.equal "" (Trial.createSuccess warnings success)
 
                 testProperty L.fail <| fun errors warnings -> 
-                    Trial.failsWithWarnings warnings errors 
+                    Trial.createFailure warnings errors 
                     |> Trial.mapErrors (List.map string)
                     |> Expect.equal "" (
                         errors
                         |> List.map string
-                        |> Trial.failsWithWarnings warnings)
+                        |> Trial.createFailure warnings)
             ]
 
             testProperty "map warnings" <| fun result warnings -> 
@@ -127,39 +127,39 @@ module Trial =
 
             testList "flatten" [
                 testProperty "pass or warn in pass or warn" <| fun success innerWarnings outerWarnings -> 
-                    Trial.warns innerWarnings success
-                    |> Trial.warns outerWarnings
+                    Trial.createSuccess innerWarnings success
+                    |> Trial.createSuccess outerWarnings
                     |> Trial.flatten
                     |> Expect.equal "" (
-                        Trial.warns (innerWarnings @ outerWarnings) success)
+                        Trial.createSuccess (innerWarnings @ outerWarnings) success)
 
                 testProperty "fail in pass or warn" <| fun errors innerWarnings outerWarnings -> 
-                    Trial.failsWithWarnings innerWarnings errors 
-                    |> Trial.warns outerWarnings
+                    Trial.createFailure innerWarnings errors 
+                    |> Trial.createSuccess outerWarnings
                     |> Trial.flatten
                     |> Expect.equal "" (
-                        Trial.failsWithWarnings (innerWarnings @ outerWarnings) errors)
+                        Trial.createFailure (innerWarnings @ outerWarnings) errors)
 
                 testProperty L.fail <| fun errors warnings -> 
-                    Trial.failsWithWarnings warnings errors 
+                    Trial.createFailure warnings errors 
                     |> Trial.flatten
                     |> Expect.equal "" (
-                        Trial.failsWithWarnings warnings errors)
+                        Trial.createFailure warnings errors)
             ]                
 
             // Написано одним из первых, есть резон упростить.
             testList "bind result" [
                 let testTo name factory = 
                     testList name [   
-                        testProperty "pass" <| factory Trial.pass Trial.warns
+                        testProperty "pass" <| factory Trial.pass Trial.createSuccess
                         testProperty "warn" <| fun newWarns -> 
-                            factory (Trial.warns newWarns) (
+                            factory (Trial.createSuccess newWarns) (
                                 List.append newWarns
-                                >> Trial.warns)
+                                >> Trial.createSuccess)
                         testProperty L.fail <| fun newWarns -> 
-                            factory (Trial.failsWithWarnings newWarns) (
+                            factory (Trial.createFailure newWarns) (
                                 List.append newWarns
-                                >> Trial.failsWithWarnings) 
+                                >> Trial.createFailure) 
                     ]
 
                 yield testTo "pass to" <| fun mapping _ success -> 
@@ -172,7 +172,7 @@ module Trial =
                     |> Expect.equal "" ([string success] |> mapping)
 
                 yield testTo "warn to" <| fun mapping toResult success warns -> 
-                    Trial.warns warns success
+                    Trial.createSuccess warns success
                     |> Trial.bindResult (
                         string 
                         >> List.singleton
@@ -181,7 +181,7 @@ module Trial =
                     |> Expect.equal "" ([string success] |> toResult warns)
 
                 yield testTo "fail to" <| fun mapping toResult errors warns -> 
-                    Trial.failsWithWarnings warns errors 
+                    Trial.createFailure warns errors 
                     |> Trial.bindResult (
                         string 
                         >> List.singleton
@@ -200,52 +200,52 @@ module Trial =
                             |> Expect.equal "" (
                                 destinationFactory binding newWarnings oldWarnings preResult)
                     testList name [
-                        test L.pow Trial.warns
-                        test L.fail Trial.failsWithWarnings
+                        test L.pow Trial.createSuccess
+                        test L.fail Trial.createFailure
                     ]
-                yield test L.pow Trial.warns (fun binding new' old -> 
+                yield test L.pow Trial.createSuccess (fun binding new' old -> 
                     string 
                     >> List.singleton
                     >> binding (new' @ old))
-                yield test L.fail Trial.failsWithWarnings (fun _ _ -> 
-                    Trial.failsWithWarnings)
+                yield test L.fail Trial.createFailure (fun _ _ -> 
+                    Trial.createFailure)
             ]
 
             testList "bind errors" [
                 testProperty L.pow <| fun success oldWarnings newWarnings -> 
-                    Trial.warns oldWarnings success
-                    |> Trial.bindErrors (List.map string >> Trial.failsWithWarnings newWarnings)
+                    Trial.createSuccess oldWarnings success
+                    |> Trial.bindErrors (List.map string >> Trial.createFailure newWarnings)
                     |> Expect.equal "" (
-                        Trial.warns oldWarnings success)
+                        Trial.createSuccess oldWarnings success)
 
                 testList (sprintf "%s -> " L.fail) [
                     testProperty L.fail <| fun errors oldWarnings newWarnings -> 
-                        Trial.failsWithWarnings oldWarnings errors 
-                        |> Trial.bindErrors (List.map string >> Trial.failsWithWarnings newWarnings)
+                        Trial.createFailure oldWarnings errors 
+                        |> Trial.bindErrors (List.map string >> Trial.createFailure newWarnings)
                         |> Expect.equal "" (
                             errors 
                             |> List.map string 
-                            |> Trial.failsWithWarnings (newWarnings @ oldWarnings))
+                            |> Trial.createFailure (newWarnings @ oldWarnings))
 
                     testProperty L.pow <| fun errors oldWarnings newWarnings -> 
-                        Trial.failsWithWarnings oldWarnings errors 
-                        |> Trial.bindErrors (List.map string >> Trial.warns newWarnings)
+                        Trial.createFailure oldWarnings errors 
+                        |> Trial.bindErrors (List.map string >> Trial.createSuccess newWarnings)
                         |> Expect.equal "" (
                             errors
                             |> List.map string 
-                            |> Trial.warns (newWarnings @ oldWarnings))
+                            |> Trial.createSuccess (newWarnings @ oldWarnings))
                 ]
             ]
 
             testList "map result 2" <| nondet { 
                 let source = [   
-                    L.pow, Trial.warns, TrialResult.shouldConvertSuccess
-                    L.fail, Trial.failsWithWarnings, TrialResult.shouldConvertFailure ]
+                    L.pow, Trial.createSuccess, TrialResult.shouldConvertSuccess
+                    L.fail, Trial.createFailure, TrialResult.shouldConvertFailure ]
                 let! name1, factory1, way1 = source
                 let! name2, factory2, way2 = source
                 let! name3, factory3, way3 = [
-                    L.pow, Trial.warns, TrialResult.Success
-                    L.fail, Trial.failsWithWarnings, TrialResult.Errors]
+                    L.pow, Trial.createSuccess, TrialResult.Success
+                    L.fail, Trial.createFailure, TrialResult.Errors]
                 return testProperty (sprintf "%s + %s -> %s" name1 name2 name3) <| fun r1 w1 r2 w2 -> 
                     (factory1 w1 r1, factory2 w2 r2)
                     ||> Trial.mapResult2 (
@@ -264,8 +264,8 @@ module Trial =
             testList "map 2 (success)" [
                 yield! nondet {
                     let source = [
-                        L.pow, Trial.warns, true
-                        L.fail, Trial.failsWithWarnings, false
+                        L.pow, Trial.createSuccess, true
+                        L.fail, Trial.createFailure, false
                     ]
                     let! name1, factory1, t1 = source
                     let! name2, factory2, t2 = source
@@ -278,23 +278,23 @@ module Trial =
                                 then
                                     [r1;r2]
                                     |> List.map string
-                                    |> Trial.warns (w1 @ w2) 
+                                    |> Trial.createSuccess (w1 @ w2) 
                                 else 
                                     [t1, r1; t2, r2] 
                                     |> List.filter (fst >> not)
                                     |> List.collect snd
-                                    |> Trial.failsWithWarnings (w1 @ w2))
+                                    |> Trial.createFailure (w1 @ w2))
                 }
             ]
 
             testList "either" [
                 testProperty L.pow <| fun success warnings -> 
-                    Trial.warns warnings success
+                    Trial.createSuccess warnings success
                     |> Trial.either (sprintf "%A %A") (fun _ _ -> shouldNotCall())
                     |> Expect.equal "" (sprintf "%A %A" warnings success)
 
                 testProperty L.fail <| fun errors warnings -> 
-                    Trial.failsWithWarnings warnings errors 
+                    Trial.createFailure warnings errors 
                     |> Trial.either (fun _ _ -> shouldNotCall ()) (sprintf "%A %A")
                     |> Expect.equal "" (sprintf "%A %A" warnings errors)
             ]
@@ -324,17 +324,17 @@ module Trial =
 
             testList "add errors" [
                 testProperty L.pow <| fun success warnings errors -> 
-                    Trial.warns warnings success 
+                    Trial.createSuccess warnings success 
                     |> Trial.addErrors errors 
                     |> Expect.equal "" (
-                        Trial.failsWithWarnings warnings errors)
+                        Trial.createFailure warnings errors)
 
                 testProperty L.fail <| fun oldErrors warnings newErrors -> 
-                    Trial.failsWithWarnings warnings oldErrors
+                    Trial.createFailure warnings oldErrors
                     |> Trial.addErrors newErrors
                     |> Expect.equal "" (
                         newErrors @ oldErrors
-                        |> Trial.failsWithWarnings warnings )
+                        |> Trial.createFailure warnings )
             ]
 
             // add error ?
@@ -346,70 +346,70 @@ module Trial =
                     |> Expect.equal "" (Trial.pass success)
 
                 testProperty "warn" <| fun success (NonEmptyArray preWarnings) -> 
-                    Trial.warns (List.ofArray preWarnings) success
+                    Trial.createSuccess (List.ofArray preWarnings) success
                     |> Trial.warningsToErrors 
                     |> Expect.equal "" (
                         preWarnings
                         |> List.ofArray
-                        |> Trial.failsWithWarnings [])
+                        |> Trial.createFailure [])
 
                 testProperty L.fail <| fun errors warnings -> 
-                    Trial.failsWithWarnings warnings errors 
+                    Trial.createFailure warnings errors 
                     |> Trial.warningsToErrors 
                     |>  Expect.equal "" (
                         warnings @ errors
-                        |> Trial.failsWithWarnings [])
+                        |> Trial.createFailure [])
             ]
 
             testList "default success" [
                 testProperty L.pow <| fun success warnings defaultSuccess -> 
-                    Trial.warns warnings success 
+                    Trial.createSuccess warnings success 
                     |> Trial.defaultSuccess defaultSuccess
-                    |> Expect.equal "" (Trial.warns warnings success)
+                    |> Expect.equal "" (Trial.createSuccess warnings success)
 
                 testProperty L.fail <| fun errors warnings defaultSuccess -> 
-                    Trial.failsWithWarnings warnings errors 
+                    Trial.createFailure warnings errors 
                     |> Trial.defaultSuccess defaultSuccess
-                    |> Expect.equal "" (Trial.warns warnings defaultSuccess)
+                    |> Expect.equal "" (Trial.createSuccess warnings defaultSuccess)
             ]
 
             testList "default success with" [
                 testProperty L.pow <| fun success warnings defaultSuccess -> 
-                    Trial.warns warnings success 
+                    Trial.createSuccess warnings success 
                     |> Trial.defaultSuccessWith (fun _ -> defaultSuccess)
-                    |> Expect.equal "" (Trial.warns warnings success)
+                    |> Expect.equal "" (Trial.createSuccess warnings success)
 
                 testProperty L.fail <| fun errors warnings defaultSuccess -> 
-                    Trial.failsWithWarnings warnings errors 
+                    Trial.createFailure warnings errors 
                     |> Trial.defaultSuccessWith (fun _ -> defaultSuccess)
-                    |> Expect.equal "" (Trial.warns warnings defaultSuccess)
+                    |> Expect.equal "" (Trial.createSuccess warnings defaultSuccess)
             ]
 
             // if fail try and fold with
 
             testList "if fail try and fold" [
                 testProperty L.pow <| fun success warnings elsePreTrial -> 
-                    Trial.warns warnings success
+                    Trial.createSuccess warnings success
                     |> Trial.ifFailTryAndFold (Trial.create <|| elsePreTrial)
-                    |> Expect.equal "" (Trial.warns warnings success)
+                    |> Expect.equal "" (Trial.createSuccess warnings success)
 
                 testProperty (sprintf "%s -> %s" L .fail L.fail)                 
                         <| fun oldErrors oldWarnings newErrors newWarnings -> 
-                    Trial.failsWithWarnings oldWarnings oldErrors
+                    Trial.createFailure oldWarnings oldErrors
                     |> Trial.ifFailTryAndFold (
-                        Trial.failsWithWarnings newWarnings newErrors)
+                        Trial.createFailure newWarnings newErrors)
                     |> Expect.equal "" (
-                        Trial.failsWithWarnings 
+                        Trial.createFailure 
                             (newWarnings @ oldWarnings) 
                             (newErrors @ oldErrors))
 
                 testProperty (sprintf "%s -> %s" L .fail L.pow)                 
                         <| fun errors oldWarnings success newWarnings -> 
-                    Trial.failsWithWarnings oldWarnings errors 
+                    Trial.createFailure oldWarnings errors 
                     |> Trial.ifFailTryAndFold (
-                        Trial.warns newWarnings success)
+                        Trial.createSuccess newWarnings success)
                     |> Expect.equal "" (
-                        Trial.warns 
+                        Trial.createSuccess 
                             (newWarnings @ oldWarnings)
                             success)
             ]
@@ -437,9 +437,9 @@ module Trial =
                                 |> List.choose (function 
                                     | TrialResult.Success p -> Some p
                                     | _ -> None)
-                                |> Trial.warns (List.collect id warnings)
+                                |> Trial.createSuccess (List.collect id warnings)
                             | errors -> 
-                                Trial.failsWithWarnings 
+                                Trial.createFailure 
                                     (List.collect id warnings) 
                                     (List.collect id errors)
                         )
@@ -448,22 +448,22 @@ module Trial =
             testList "collect while successed" [
                 testProperty "all pass or warn" <| fun successAndWarnings -> 
                     let successes, warnings = successAndWarnings |> List.unzip
-                    List.map2 Trial.warns warnings successes
+                    List.map2 Trial.createSuccess warnings successes
                     |> Trial.collectWhileSuccessed 
                     |> Expect.equal "" (
-                        Trial.warns (List.collect id warnings) successes)
+                        Trial.createSuccess (List.collect id warnings) successes)
 
                 testProperty L.fail <| fun successAndWarnings errors warningsInFailed other -> 
                     let successes, warnings = successAndWarnings |> List.unzip
-                    List.map2 Trial.warns warnings successes
+                    List.map2 Trial.createSuccess warnings successes
                     |> List.append <| (
                         other
                         |> List.unzip
                         ||> List.map2 Trial.create
-                        |> List.append [Trial.failsWithWarnings warningsInFailed errors])
+                        |> List.append [Trial.createFailure warningsInFailed errors])
                     |> Trial.collectWhileSuccessed
                     |> Expect.equal "" (
-                        Trial.failsWithWarnings 
+                        Trial.createFailure 
                             (List.collect id warnings @ warningsInFailed)
                             errors)
             ]
@@ -517,7 +517,7 @@ module Trial =
             testList "apply" [
                 testProperty L.pow <| fun fWarnings result warnings -> 
                     Trial.create warnings result 
-                    |> Trial.apply (Trial.warns fWarnings hash)
+                    |> Trial.apply (Trial.createSuccess fWarnings hash)
                     |> Expect.equal "" (
                         Trial.create warnings result 
                         |> Trial.map hash 
@@ -525,7 +525,7 @@ module Trial =
 
                 testProperty L.fail <| fun fErrors fWarnings result warnings -> 
                     Trial.create warnings result 
-                    |> Trial.apply (Trial.failsWithWarnings fWarnings fErrors)
+                    |> Trial.apply (Trial.createFailure fWarnings fErrors)
                     |> Expect.equal "" (
                         Trial.create warnings result 
                         |> Trial.addErrors fErrors
@@ -535,14 +535,14 @@ module Trial =
             testList "iter" [
                 testProperty L.pow <| fun value warnings -> 
                     let mutable passTest = None
-                    Trial.warns warnings value
+                    Trial.createSuccess warnings value
                     |> Trial.iter (fun value -> passTest <- Some <| hash value)
                     |> Expect.equal "" ()
                     passTest |> Expect.equal "" (Some <| hash value)
                     
                 testProperty L.fail <| fun errors warnings -> 
                     let mutable passTest = None
-                    Trial.failsWithWarnings warnings errors
+                    Trial.createFailure warnings errors
                     |> Trial.iter (fun value -> passTest <- Some <| hash value)
                     |> Expect.equal "" ()
                     passTest |> Expect.equal "" None                    
@@ -550,8 +550,8 @@ module Trial =
 
             testList "iter2" <| nondet {
                 let config = [
-                    L.pow, Trial.warns
-                    L.fail, Trial.failsWithWarnings
+                    L.pow, Trial.createSuccess
+                    L.fail, Trial.createFailure
                 ]
                 let name = fst
                 let factory = snd
@@ -626,20 +626,20 @@ module TrialBuilder =
             testList "bind" [
                 testProperty L.pow <| fun success warnings -> 
                     trial {
-                        let! p = Trial.warns warnings success
+                        let! p = Trial.createSuccess warnings success
                         return hash p
                     }
                     |> Expect.equal "" (
                         hash success
-                        |> Trial.warns warnings)
+                        |> Trial.createSuccess warnings)
 
                 testProperty L.fail <| fun errors warnings -> 
                     trial {
-                        let! p = Trial.failsWithWarnings warnings errors
+                        let! p = Trial.createFailure warnings errors
                         return hash p
                     }
                     |> Expect.equal "" (
-                        Trial.failsWithWarnings warnings errors)
+                        Trial.createFailure warnings errors)
             ]
 
             testProperty "combine" <| fun value ->
@@ -748,22 +748,22 @@ module AsyncTrialBuilder =
             testList "bind" [
                 testProperty L.pow <| fun success warnings -> 
                     asyncTrial {
-                        let! p = Trial.warns warnings success
+                        let! p = Trial.createSuccess warnings success
                         return hash p
                     }
                     |> Async.RunSynchronously
                     |> Expect.equal "" (
                         hash success
-                        |> Trial.warns warnings)
+                        |> Trial.createSuccess warnings)
 
                 testProperty L.fail <| fun errors warnings -> 
                     asyncTrial {
-                        let! p = Trial.failsWithWarnings warnings errors
+                        let! p = Trial.createFailure warnings errors
                         return hash p
                     }
                     |> Async.RunSynchronously
                     |> Expect.equal "" (
-                        Trial.failsWithWarnings warnings errors)
+                        Trial.createFailure warnings errors)
             ]
 
             testProperty "combine" <| fun value ->
