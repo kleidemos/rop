@@ -390,15 +390,15 @@ module Trial =
                 |> TrialResult.Success
             |> create (List.ofSeq warnings.Seq)
 
-    type Trial<'result, 'warning, 'error> with
-        member this.Success = 
-            success this
-        member this.Errors = 
-            errors this        
-        member this.IsSuccess = 
-            isSuccess this
-        member this.IsFail = 
-            isFail this
+type Trial<'result, 'warning, 'error> with
+    member this.Success = 
+        Trial.success this
+    member this.Errors = 
+        Trial.errors this        
+    member this.IsSuccess = 
+        Trial.isSuccess this
+    member this.IsFail = 
+        Trial.isFail this
 
 // Почти чистая копипаста.
 [<AutoOpen>]
