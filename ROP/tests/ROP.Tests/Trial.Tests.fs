@@ -514,6 +514,19 @@ module Trial =
                     |> Expect.equal "" (Trial.fail error)
             ]
 
+            testList "catch" [
+                testProperty L.pow <| fun success -> 
+                    let f () = success
+                    Trial.catch f 
+                    |> Expect.equal "" (Trial.pass success)
+
+                testCase L.fail <| fun () -> 
+                    let ex = System.Exception("Expected exception.")
+                    let f () = raise ex
+                    Trial.catch f 
+                    |> Expect.equal "" (Trial.fail ex)
+            ]
+
             testList "apply" [
                 testProperty L.pow <| fun fWarnings result warnings -> 
                     Trial.create warnings result 

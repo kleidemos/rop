@@ -302,6 +302,11 @@ module Trial =
         | Ok success -> pass success
         | Error error -> fail error
 
+    let catch f = 
+        try f () |> pass 
+        with 
+        | ex -> fail ex
+
     // TODO: Тащить варнинги?
     let apply f trial = 
         map2 (fun f trial -> f trial) f trial
