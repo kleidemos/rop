@@ -494,27 +494,27 @@ module AsyncTrialBuilder =
         member this.Bind (async', binding : 'd -> _) : AsyncTrial<'a,'b,'c> = 
             async.Bind(async', Trial.pass >> async.Return)
             |> AsyncTrial.bind binding
-        //member inline this.Combine (a, b : unit -> _) : AsyncTrial<'a,'b,'c> = 
-        //    AsyncTrial.bind b a
+        member this.Combine (a : AsyncTrial<unit,'b,'c>, b) : AsyncTrial<'a,'b,'c> = 
+            AsyncTrial.bind (fun () -> b) a
         member this.TryWith (AsyncTrial.T trial, handler) : AsyncTrial<'a,'b,'c> = 
             async.TryWith(trial, handler)
         member this.TryFinally (AsyncTrial.T trial, compensation) : AsyncTrial<'a,'b,'c> = 
             async.TryFinally(trial, compensation)
         member this.Using (d : #System.IDisposable, body) : AsyncTrial<'a,'b,'c> = 
             async.Using(d, body)
-        //member inline this.While(guard, body) : AsyncTrial<unit,'b,'c> = 
-        //    if not <| guard () then 
-        //        this.Zero() 
-        //    else 
-        //        body
-        //        |> AsyncTrial.bind (fun () -> 
-        //            this.While(guard, body))
-        //member this.For(s : _ seq, body) : AsyncTrial<unit,'b,'c> = 
-        //    this.Using(s.GetEnumerator(), fun enum -> 
-        //        this.While(
-        //            enum.MoveNext
-        //            , this.Delay(fun () -> body enum.Current)
-        //        )
-        //    )
+        member this.While(guard, body) : AsyncTrial<unit,'b,'c> = 
+            if not <| guard () then 
+                this.Zero() 
+            else 
+                body
+                |> AsyncTrial.bind (fun () -> 
+                    this.While(guard, body))
+        member this.For(s : _ seq, body) : AsyncTrial<unit,'b,'c> = 
+            this.Using(s.GetEnumerator(), fun enum -> 
+                this.While(
+                    enum.MoveNext
+                    , this.Delay(fun () -> body enum.Current)
+                )
+            )
             
     let asyncTrial = AsyncTrialBuilder()

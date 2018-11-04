@@ -766,15 +766,15 @@ module AsyncTrialBuilder =
                         Trial.failsWithWarnings warnings errors)
             ]
 
-            //testProperty "combine" <| fun value ->
-            //    asyncTrial {
-            //        let! f = Trial.pass ()
-            //        if value <> 42 then 
-            //            do f
-            //        return  value
-            //    }
-            //    |> Async.RunSynchronously
-            //    |> Expect.equal "" (Trial.pass value)
+            testProperty "combine" <| fun value ->
+                asyncTrial {
+                    let! f = Trial.pass ()
+                    if value <> 42 then 
+                        do f
+                    return  value
+                }
+                |> Async.RunSynchronously
+                |> Expect.equal "" (Trial.pass value)
 
             testList "try with" [
                 testProperty L.success <| fun value ->
@@ -852,22 +852,22 @@ module AsyncTrialBuilder =
                     |> Expect.throws ""
                     passTest |> Expect.isTrue ""
             ]
-            //testCase "while" <| fun () -> 
-            //    asyncTrial {
-            //        let mutable counter = 0
-            //        while counter < 42 do
-            //            counter <- counter + 1 
-            //        return 42
-            //    }
-            //    |> Async.RunSynchronously
-            //    |> Expect.equal "" (Trial.pass 42)
-            //testProperty "for" <| fun items -> 
-            //    asyncTrial {
-            //        let mutable sum = 0
-            //        for item in items do sum <- sum + item
-            //        return sum
-            //    }
-            //    |> Async.RunSynchronously
-            //    |> Expect.equal "" (Trial.pass (items |> List.sum))
+            testCase "while" <| fun () -> 
+                asyncTrial {
+                    let mutable counter = 0
+                    while counter < 42 do
+                        counter <- counter + 1 
+                    return 42                    
+                }
+                |> Async.RunSynchronously
+                |> Expect.equal "" (Trial.pass 42)
+            testProperty "for" <| fun items -> 
+                asyncTrial {
+                    let mutable sum = 0
+                    for item in items do sum <- sum + item
+                    return sum
+                }
+                |> Async.RunSynchronously
+                |> Expect.equal "" (Trial.pass (items |> List.sum))
                 
         ]
