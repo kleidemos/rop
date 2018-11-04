@@ -1,50 +1,48 @@
 namespace ROP
 
-module private ChoiceOf2 = 
-    let try1Of2 = function 
-        | Choice1Of2 p -> Some p 
-        | _ -> None
-
-    let try2Of2 = function 
-        | Choice2Of2 p -> Some p 
-        | _ -> None
-
-    let map mapping = function 
-        | Choice1Of2 p -> mapping p |> Choice1Of2
-        | Choice2Of2 p -> Choice2Of2 p 
-
-    let flatten = function 
-        | Choice1Of2 (Choice1Of2 p) -> Choice1Of2 p
-        | Choice1Of2 (Choice2Of2 p) -> Choice2Of2 p
-        | Choice2Of2 p -> Choice2Of2 p
-
-    let flattenSecond = function
-        | Choice1Of2 p -> Choice1Of2 p
-        | Choice2Of2 (Choice1Of2 p) -> Choice1Of2 p
-        | Choice2Of2 (Choice2Of2 p) -> Choice2Of2 p
-        
-    let mapSecond mapping = function
-        | Choice1Of2 p -> Choice1Of2 p
-        | Choice2Of2 p -> mapping p |> Choice2Of2
-
-type Trial<'result, 'warning, 'error> = {
-    Result : Choice<'result, 'error list>
-    Warnings : 'warning list
-}
-
-[<AutoOpen>]
-module RopAuto = 
-    let (|Pass|Warn|Fail|) (trial : Trial<_,_,_>) = 
-        match trial.Result, trial.Warnings with
-        | Choice1Of2 p, [] -> Pass p
-        | Choice1Of2 p, _ -> Warn (p, trial.Warnings)
-        | Choice2Of2 p, _ -> Fail (p, trial.Warnings)
-
 module Trial = 
+    [<RequireQualifiedAccess>]
+    type Result<'result, 'error> = 
+        | Success of 'result
+        | Errors of 'error list
+    
+    module Result = 
+        let success = function 
+            | Result.Success p -> Some p
+            | Result.Errors _ -> None
+
+        let errors = function
+            | Result.Success _ -> None
+            | Result.Errors p -> Some p
+
+        let map mapping = function
+            | Result.Success p -> mapping p |> Result.Success
+            | Result.Errors p -> Result.Errors p
+
+        let flatten = function
+            | Result.Success (Result.Success p) -> Result.Success p
+            | Result.Success (Result.Errors p) -> Result.Errors p
+            | Result.Errors p -> Result.Errors p
+
+        let mapErrors mapping = function 
+            | Result.Success p -> Result.Success p  
+            | Result.Errors p -> mapping p |> Result.Errors
+
+    type Trial<'result, 'warning, 'error> = {
+        Result : Result<'result, 'error>
+        Warnings : 'warning list
+    }    
+            
     let (|Success|Failure|) trial = 
         match trial.Result with
-        | Choice1Of2 p -> Success (p, trial.Warnings)
-        | Choice2Of2 p -> Failure (p, trial.Warnings)
+        | Result.Success p -> Success (p, trial.Warnings)
+        | Result.Errors p -> Failure (p, trial.Warnings)
+        
+    let (|Pass|Warn|Fail|) trial = 
+        match trial.Result, trial.Warnings with
+        | Result.Success p, [] -> Pass p
+        | Result.Success p, _ -> Warn (p, trial.Warnings)
+        | Result.Errors p, _ -> Fail (p, trial.Warnings)
     
     // Getters
     
@@ -57,17 +55,15 @@ module Trial =
     let success trial = 
         trial
         |> result 
-        |> ChoiceOf2.try1Of2
+        |> Result.success
 
     let errors trial = 
         trial 
         |> result 
-        |> ChoiceOf2.try2Of2
+        |> Result.errors
 
     let isSuccess trial = 
-        match trial.Result with
-        | Choice1Of2 _ -> true
-        | _ -> false
+        trial |> success |> Option.isSome
 
     let isFail trial = 
         isSuccess trial |> not
@@ -80,7 +76,7 @@ module Trial =
     }
 
     let warns warns success = 
-        Choice1Of2 success
+        Result.Success success
         |> create warns 
 
     let pass success = 
@@ -94,7 +90,7 @@ module Trial =
         warns [message] success
 
     let failsWithWarnings warnings errors = 
-        Choice2Of2 errors
+        Result.Errors errors
         |> create warnings 
 
     let fails errors = 
@@ -113,19 +109,21 @@ module Trial =
     let mapResultApart successMapping failureMapping trial = {
         Result = 
             match trial.Result with
-            | Choice1Of2 p -> successMapping p |> Choice1Of2
-            | Choice2Of2 p -> failureMapping p |> Choice2Of2
+            | Result.Success p -> 
+                successMapping p |> Result.Success
+            | Result.Errors p -> 
+                failureMapping p |> Result.Errors
         Warnings = trial.Warnings
     }
 
     let map mapping trial = 
-        mapResult (ChoiceOf2.map mapping) trial
+        mapResult (Result.map mapping) trial
 
     /// Alias of map.
     let mapSuccess = map
 
     let mapErrors mapping trial = 
-        mapResult (ChoiceOf2.mapSecond mapping) trial
+        mapResult (Result.mapErrors mapping) trial
 
     let mapWarnings mapping trial = {
         Result = trial.Result
@@ -134,16 +132,16 @@ module Trial =
 
     let flatten trial = 
         match trial.Result with
-        | Choice1Of2 p -> 
+        | Result.Success p -> 
             create (p.Warnings @ trial.Warnings) p.Result
-        | Choice2Of2 p -> 
-            create trial.Warnings <| Choice2Of2 p
+        | Result.Errors p -> 
+            create trial.Warnings <| Result.Errors p
         
     let bindResult binding trial = 
         match binding trial.Result with
-        | Pass p -> [], Choice1Of2 p
-        | Warn (p, warns) -> warns, Choice1Of2 p
-        | Fail (errors, warns) -> warns, Choice2Of2 errors 
+        | Pass p -> [], Result.Success p
+        | Warn (p, warns) -> warns, Result.Success p
+        | Fail (errors, warns) -> warns, Result.Errors errors 
         ||> fun warns -> create (warns @ trial.Warnings)
 
     //let bindResultApart if
@@ -158,9 +156,9 @@ module Trial =
 
     let bindErrors binding trial = 
         match trial.Result with
-        | Choice1Of2 p -> 
-            create trial.Warnings <| Choice1Of2 p
-        | Choice2Of2 p ->
+        | Result.Success p -> 
+            create trial.Warnings <| Result.Success p
+        | Result.Errors p ->
             binding p 
             |> mapWarnings (fun p -> p @ trial.Warnings)
 
@@ -174,14 +172,14 @@ module Trial =
     let map2 mapping trial1 trial2 = 
         mapResult2 (fun c1 c2 -> 
             match c1, c2 with
-            | Choice1Of2 s1, Choice1Of2 s2 -> 
-                mapping s1 s2 |> Choice1Of2
-            | Choice2Of2 f1, Choice2Of2 f2 -> 
-                f1 @ f2 |> Choice2Of2
-            | Choice2Of2 f, _ -> 
-                Choice2Of2 f 
-            | _, Choice2Of2 f -> 
-                Choice2Of2 f)                
+            | Result.Success s1, Result.Success s2 -> 
+                mapping s1 s2 |> Result.Success
+            | Result.Errors f1, Result.Errors f2 -> 
+                f1 @ f2 |> Result.Errors
+            | Result.Errors f, _ -> 
+                Result.Errors f 
+            | _, Result.Errors f -> 
+                Result.Errors f)                
             trial1 trial2
 
     /// Alias of map2
@@ -191,8 +189,8 @@ module Trial =
 
     let either ifSucces ifFauilure trial = 
         match trial.Result with
-        | Choice1Of2 p -> ifSucces trial.Warnings p
-        | Choice2Of2 p -> ifFauilure trial.Warnings p
+        | Result.Success p -> ifSucces trial.Warnings p
+        | Result.Errors p -> ifFauilure trial.Warnings p
 
     let dropWarnings trial = { 
         Result = trial.Result
@@ -212,9 +210,9 @@ module Trial =
     let addErrors errors trial = {
         Result = 
             match trial.Result with
-            | Choice1Of2 _ -> errors
-            | Choice2Of2 oldWarnings -> errors @ oldWarnings 
-            |> Choice2Of2
+            | Result.Success _ -> errors
+            | Result.Errors oldWarnings -> errors @ oldWarnings 
+            |> Result.Errors
         Warnings = trial.Warnings
     }
 
@@ -366,32 +364,31 @@ module Trial =
             let errors = Collection.ofOption config.Errors
             for trial in trials do 
                 match trial.Result with
-                | Choice1Of2 success -> 
+                | Result.Success success -> 
                     if not <| errors.Used() then
                         successes.AddRange [success]
-                | Choice2Of2 ers -> 
+                | Result.Errors ers -> 
                     errors.AddRange ers
                 trial.Warnings |> warnings.AddRange
             if errors.Used() then 
                 errors.Seq
                 |> List.ofSeq
-                |> Choice2Of2
+                |> Result.Errors
             else 
                 successes.Seq
                 |> List.ofSeq
-                |> Choice1Of2
+                |> Result.Success
             |> create (List.ofSeq warnings.Seq)
 
-
-type Trial<'result, 'warning, 'error> with
-    member this.Success = 
-        Trial.success this
-    member this.Errors = 
-        Trial.errors this        
-    member this.IsSuccess = 
-        Trial.isSuccess this
-    member this.IsFail = 
-        Trial.isFail this
+    type Trial<'result, 'warning, 'error> with
+        member this.Success = 
+            success this
+        member this.Errors = 
+            errors this        
+        member this.IsSuccess = 
+            isSuccess this
+        member this.IsFail = 
+            isFail this
 
 // Почти чистая копипаста.
 [<AutoOpen>]
@@ -431,3 +428,8 @@ module TrialBuilder =
 
     let trial = TrialBuilder()
 
+type Trial<'success, 'warning, 'error> = 
+    Trial.Trial<'success, 'warning, 'error>
+
+type TrialResult<'success, 'error> = 
+    Trial.Result<'success, 'error>

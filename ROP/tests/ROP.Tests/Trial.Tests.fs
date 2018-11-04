@@ -12,13 +12,13 @@ module Utils =
     let shouldNotCallT p = 
         failtest "Should not call."
 
-    module Choice2 = 
-        let shouldConvert1Of2 mapping = function 
-            | Choice1Of2 p -> mapping p
+    module TrialResult = 
+        let shouldConvertSuccess mapping = function 
+            | TrialResult.Success p -> mapping p
             | _ -> shouldNotCall ()
 
         let shouldConvert2Of2 mapping = function 
-            | Choice2Of2 p -> mapping p 
+            | TrialResult.Errors p -> mapping p 
             | _ -> shouldNotCall ()
 
     module List = 
@@ -60,15 +60,15 @@ module Trial =
                         yield test
                             L.pow
                             Trial.warns
-                            Choice1Of2
+                            Trial.Result.Success
                         yield test
                             L.fail
                             Trial.failsWithWarnings
-                            Choice2Of2                        
+                            Trial.Result.Errors              
                     ]
 
-                yield test L.pow Trial.warns Choice2.shouldConvert1Of2
-                yield test L.fail Trial.failsWithWarnings Choice2.shouldConvert2Of2
+                yield test L.pow Trial.warns TrialResult.shouldConvertSuccess
+                yield test L.fail Trial.failsWithWarnings TrialResult.shouldConvert2Of2
             ]
 
             testList "map result apart" [
@@ -168,7 +168,7 @@ module Trial =
                         string 
                         >> List.singleton
                         >> mapping
-                        |> Choice2.shouldConvert1Of2)
+                        |> TrialResult.shouldConvertSuccess)
                     |> Expect.equal "" ([string success] |> mapping)
 
                 yield testTo "warn to" <| fun mapping toResult success warns -> 
@@ -177,7 +177,7 @@ module Trial =
                         string 
                         >> List.singleton
                         >> mapping
-                        |> Choice2.shouldConvert1Of2)
+                        |> TrialResult.shouldConvertSuccess)
                     |> Expect.equal "" ([string success] |> toResult warns)
 
                 yield testTo "fail to" <| fun mapping toResult errors warns -> 
@@ -186,7 +186,7 @@ module Trial =
                         string 
                         >> List.singleton
                         >> mapping
-                        |> Choice2.shouldConvert2Of2)
+                        |> TrialResult.shouldConvert2Of2)
                     |> Expect.equal "" ([string errors] |> toResult warns)
             ]
 
@@ -239,13 +239,13 @@ module Trial =
 
             testList "map result 2" <| nondet { 
                 let source = [   
-                    L.pow, Trial.warns, Choice2.shouldConvert1Of2
-                    L.fail, Trial.failsWithWarnings, Choice2.shouldConvert2Of2 ]
+                    L.pow, Trial.warns, TrialResult.shouldConvertSuccess
+                    L.fail, Trial.failsWithWarnings, TrialResult.shouldConvert2Of2 ]
                 let! name1, factory1, way1 = source
                 let! name2, factory2, way2 = source
                 let! name3, factory3, way3 = [
-                    L.pow, Trial.warns, Choice1Of2
-                    L.fail, Trial.failsWithWarnings, Choice2Of2 ]
+                    L.pow, Trial.warns, Trial.Result.Success
+                    L.fail, Trial.failsWithWarnings, Trial.Result.Errors]
                 return testProperty (sprintf "%s + %s -> %s" name1 name2 name3) <| fun r1 w1 r2 w2 -> 
                     (factory1 w1 r1, factory2 w2 r2)
                     ||> Trial.mapResult2 (
@@ -429,13 +429,13 @@ module Trial =
                     |> Expect.equal "" (
                         results
                         |> List.choose (function 
-                            | Choice2Of2 p -> Some p
+                            | TrialResult.Errors p -> Some p
                             | _ -> None)
                         |> function 
                             | [] -> 
                                 results 
                                 |> List.choose (function 
-                                    | Choice1Of2 p -> Some p
+                                    | TrialResult.Success p -> Some p
                                     | _ -> None)
                                 |> Trial.warns (List.collect id warnings)
                             | errors -> 
