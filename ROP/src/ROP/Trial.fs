@@ -1,48 +1,58 @@
 namespace ROP
 
-module Trial = 
-    [<RequireQualifiedAccess>]
-    type Result<'result, 'error> = 
-        | Success of 'result
-        | Errors of 'error list
+[<RequireQualifiedAccess>]
+type TrialResult<'result, 'error> = 
+    | Success of 'result
+    | Errors of 'error list
     
-    module Result = 
-        let success = function 
-            | Result.Success p -> Some p
-            | Result.Errors _ -> None
+module TrialResult = 
+    let success = function 
+        | TrialResult.Success p -> Some p
+        | TrialResult.Errors _ -> None
 
-        let errors = function
-            | Result.Success _ -> None
-            | Result.Errors p -> Some p
+    let errors = function
+        | TrialResult.Success _ -> None
+        | TrialResult.Errors p -> Some p
 
-        let map mapping = function
-            | Result.Success p -> mapping p |> Result.Success
-            | Result.Errors p -> Result.Errors p
+    let ofChoice choice = 
+        match choice with
+        | Choice1Of2 p -> TrialResult.Success p 
+        | Choice2Of2 p -> TrialResult.Errors [p]
 
-        let flatten = function
-            | Result.Success (Result.Success p) -> Result.Success p
-            | Result.Success (Result.Errors p) -> Result.Errors p
-            | Result.Errors p -> Result.Errors p
+    let ofResult result = 
+        match result with
+        | Ok p -> TrialResult.Success p 
+        | Error p -> TrialResult.Errors [p]
 
-        let mapErrors mapping = function 
-            | Result.Success p -> Result.Success p  
-            | Result.Errors p -> mapping p |> Result.Errors
+    let map mapping = function
+        | TrialResult.Success p -> mapping p |> TrialResult.Success
+        | TrialResult.Errors p -> TrialResult.Errors p
 
-    type Trial<'result, 'warning, 'error> = {
-        Result : Result<'result, 'error>
-        Warnings : 'warning list
-    }    
-            
+    let flatten = function
+        | TrialResult.Success (TrialResult.Success p) -> TrialResult.Success p
+        | TrialResult.Success (TrialResult.Errors p) -> TrialResult.Errors p
+        | TrialResult.Errors p -> TrialResult.Errors p
+
+    let mapErrors mapping = function 
+        | TrialResult.Success p -> TrialResult.Success p  
+        | TrialResult.Errors p -> mapping p |> TrialResult.Errors
+    
+type Trial<'result, 'warning, 'error> = {
+    Result : TrialResult<'result, 'error>
+    Warnings : 'warning list
+}    
+
+module Trial =                         
     let (|Success|Failure|) trial = 
         match trial.Result with
-        | Result.Success p -> Success (p, trial.Warnings)
-        | Result.Errors p -> Failure (p, trial.Warnings)
+        | TrialResult.Success p -> Success (p, trial.Warnings)
+        | TrialResult.Errors p -> Failure (p, trial.Warnings)
         
     let (|Pass|Warn|Fail|) trial = 
         match trial.Result, trial.Warnings with
-        | Result.Success p, [] -> Pass p
-        | Result.Success p, _ -> Warn (p, trial.Warnings)
-        | Result.Errors p, _ -> Fail (p, trial.Warnings)
+        | TrialResult.Success p, [] -> Pass p
+        | TrialResult.Success p, _ -> Warn (p, trial.Warnings)
+        | TrialResult.Errors p, _ -> Fail (p, trial.Warnings)
     
     // Getters
     
@@ -55,12 +65,12 @@ module Trial =
     let success trial = 
         trial
         |> result 
-        |> Result.success
+        |> TrialResult.success
 
     let errors trial = 
         trial 
         |> result 
-        |> Result.errors
+        |> TrialResult.errors
 
     let isSuccess trial = 
         trial |> success |> Option.isSome
@@ -76,7 +86,7 @@ module Trial =
     }
 
     let warns warns success = 
-        Result.Success success
+        TrialResult.Success success
         |> create warns 
 
     let pass success = 
@@ -90,7 +100,7 @@ module Trial =
         warns [message] success
 
     let failsWithWarnings warnings errors = 
-        Result.Errors errors
+        TrialResult.Errors errors
         |> create warnings 
 
     let fails errors = 
@@ -109,21 +119,21 @@ module Trial =
     let mapResultApart successMapping failureMapping trial = {
         Result = 
             match trial.Result with
-            | Result.Success p -> 
-                successMapping p |> Result.Success
-            | Result.Errors p -> 
-                failureMapping p |> Result.Errors
+            | TrialResult.Success p -> 
+                successMapping p |> TrialResult.Success
+            | TrialResult.Errors p -> 
+                failureMapping p |> TrialResult.Errors
         Warnings = trial.Warnings
     }
 
     let map mapping trial = 
-        mapResult (Result.map mapping) trial
+        mapResult (TrialResult.map mapping) trial
 
     /// Alias of map.
     let mapSuccess = map
 
     let mapErrors mapping trial = 
-        mapResult (Result.mapErrors mapping) trial
+        mapResult (TrialResult.mapErrors mapping) trial
 
     let mapWarnings mapping trial = {
         Result = trial.Result
@@ -132,16 +142,16 @@ module Trial =
 
     let flatten trial = 
         match trial.Result with
-        | Result.Success p -> 
+        | TrialResult.Success p -> 
             create (p.Warnings @ trial.Warnings) p.Result
-        | Result.Errors p -> 
-            create trial.Warnings <| Result.Errors p
+        | TrialResult.Errors p -> 
+            create trial.Warnings <| TrialResult.Errors p
         
     let bindResult binding trial = 
         match binding trial.Result with
-        | Pass p -> [], Result.Success p
-        | Warn (p, warns) -> warns, Result.Success p
-        | Fail (errors, warns) -> warns, Result.Errors errors 
+        | Pass p -> [], TrialResult.Success p
+        | Warn (p, warns) -> warns, TrialResult.Success p
+        | Fail (errors, warns) -> warns, TrialResult.Errors errors 
         ||> fun warns -> create (warns @ trial.Warnings)
 
     //let bindResultApart if
@@ -156,9 +166,9 @@ module Trial =
 
     let bindErrors binding trial = 
         match trial.Result with
-        | Result.Success p -> 
-            create trial.Warnings <| Result.Success p
-        | Result.Errors p ->
+        | TrialResult.Success p -> 
+            create trial.Warnings <| TrialResult.Success p
+        | TrialResult.Errors p ->
             binding p 
             |> mapWarnings (fun p -> p @ trial.Warnings)
 
@@ -172,14 +182,14 @@ module Trial =
     let map2 mapping trial1 trial2 = 
         mapResult2 (fun c1 c2 -> 
             match c1, c2 with
-            | Result.Success s1, Result.Success s2 -> 
-                mapping s1 s2 |> Result.Success
-            | Result.Errors f1, Result.Errors f2 -> 
-                f1 @ f2 |> Result.Errors
-            | Result.Errors f, _ -> 
-                Result.Errors f 
-            | _, Result.Errors f -> 
-                Result.Errors f)                
+            | TrialResult.Success s1, TrialResult.Success s2 -> 
+                mapping s1 s2 |> TrialResult.Success
+            | TrialResult.Errors f1, TrialResult.Errors f2 -> 
+                f1 @ f2 |> TrialResult.Errors
+            | TrialResult.Errors f, _ -> 
+                TrialResult.Errors f 
+            | _, TrialResult.Errors f -> 
+                TrialResult.Errors f)                
             trial1 trial2
 
     /// Alias of map2
@@ -189,8 +199,8 @@ module Trial =
 
     let either ifSucces ifFauilure trial = 
         match trial.Result with
-        | Result.Success p -> ifSucces trial.Warnings p
-        | Result.Errors p -> ifFauilure trial.Warnings p
+        | TrialResult.Success p -> ifSucces trial.Warnings p
+        | TrialResult.Errors p -> ifFauilure trial.Warnings p
 
     let dropWarnings trial = { 
         Result = trial.Result
@@ -210,9 +220,9 @@ module Trial =
     let addErrors errors trial = {
         Result = 
             match trial.Result with
-            | Result.Success _ -> errors
-            | Result.Errors oldWarnings -> errors @ oldWarnings 
-            |> Result.Errors
+            | TrialResult.Success _ -> errors
+            | TrialResult.Errors oldWarnings -> errors @ oldWarnings 
+            |> TrialResult.Errors
         Warnings = trial.Warnings
     }
 
@@ -364,20 +374,20 @@ module Trial =
             let errors = Collection.ofOption config.Errors
             for trial in trials do 
                 match trial.Result with
-                | Result.Success success -> 
+                | TrialResult.Success success -> 
                     if not <| errors.Used() then
                         successes.AddRange [success]
-                | Result.Errors ers -> 
+                | TrialResult.Errors ers -> 
                     errors.AddRange ers
                 trial.Warnings |> warnings.AddRange
             if errors.Used() then 
                 errors.Seq
                 |> List.ofSeq
-                |> Result.Errors
+                |> TrialResult.Errors
             else 
                 successes.Seq
                 |> List.ofSeq
-                |> Result.Success
+                |> TrialResult.Success
             |> create (List.ofSeq warnings.Seq)
 
     type Trial<'result, 'warning, 'error> with
@@ -428,8 +438,83 @@ module TrialBuilder =
 
     let trial = TrialBuilder()
 
-type Trial<'success, 'warning, 'error> = 
-    Trial.Trial<'success, 'warning, 'error>
+type AsyncTrial<'success, 'warning, 'error> = 
+    Async<Trial<'success, 'warning, 'error>>
 
-type TrialResult<'success, 'error> = 
-    Trial.Result<'success, 'error>
+module AsyncTrial = 
+    let (|T|) (aTrial : AsyncTrial<'success, 'warning, 'error>) = aTrial
+
+    let ofTrialAsync (trial : Trial<Async<'success>,_,_>) = async {
+        match trial with
+        | Trial.Success (preSuccess, warnings) -> 
+            let! success = preSuccess
+            return Trial.warns warnings success
+        | Trial.Failure (errors, warnings) -> 
+            return Trial.failsWithWarnings warnings errors
+    }
+
+    let bind binding (T trial) : AsyncTrial<_,_,_> = async {
+        let! trial = trial            
+        let! preResult = 
+            Trial.map binding trial
+            |> ofTrialAsync
+        return 
+            preResult
+            |> Trial.flatten
+    }
+
+    let map mapping trial : AsyncTrial<_,_,_> = 
+        bind (mapping >> Trial.pass >> async.Return) trial
+
+    let flatten (trial : AsyncTrial<AsyncTrial<_,_,_>,_,_>) : AsyncTrial<_,_,_> = async {
+        let! trial = trial
+        let! preResult = trial |> ofTrialAsync
+        return Trial.flatten preResult
+    }
+        
+
+[<AutoOpen>]
+module AsyncTrialBuilder = 
+    type AsyncTrialBuilder() = 
+        member this.Return value : AsyncTrial<'a,'b,'c> = 
+            value 
+            |> Trial.pass
+            |> async.Return
+        member this.ReturnFrom (AsyncTrial.T p) : AsyncTrial<'a,'b,'c> = 
+            p 
+        member this.Zero() : AsyncTrial<unit,'b,'c> = 
+            this.Return ()
+        member this.Delay generator : AsyncTrial<'a,'b,'c> = 
+            async.Delay generator
+        member this.Bind (trial, binding : 'd -> _) : AsyncTrial<'a,'b,'c> = 
+            AsyncTrial.bind binding trial
+        member this.Bind (trial, binding : 'd -> _) : AsyncTrial<'a,'b,'c> = 
+            async.Return trial
+            |> AsyncTrial.bind binding
+        member this.Bind (async', binding : 'd -> _) : AsyncTrial<'a,'b,'c> = 
+            async.Bind(async', Trial.pass >> async.Return)
+            |> AsyncTrial.bind binding
+        //member inline this.Combine (a, b : unit -> _) : AsyncTrial<'a,'b,'c> = 
+        //    AsyncTrial.bind b a
+        member this.TryWith (AsyncTrial.T trial, handler) : AsyncTrial<'a,'b,'c> = 
+            async.TryWith(trial, handler)
+        member this.TryFinally (AsyncTrial.T trial, compensation) : AsyncTrial<'a,'b,'c> = 
+            async.TryFinally(trial, compensation)
+        member this.Using (d : #System.IDisposable, body) : AsyncTrial<'a,'b,'c> = 
+            async.Using(d, body)
+        //member inline this.While(guard, body) : AsyncTrial<unit,'b,'c> = 
+        //    if not <| guard () then 
+        //        this.Zero() 
+        //    else 
+        //        body
+        //        |> AsyncTrial.bind (fun () -> 
+        //            this.While(guard, body))
+        //member this.For(s : _ seq, body) : AsyncTrial<unit,'b,'c> = 
+        //    this.Using(s.GetEnumerator(), fun enum -> 
+        //        this.While(
+        //            enum.MoveNext
+        //            , this.Delay(fun () -> body enum.Current)
+        //        )
+        //    )
+            
+    let asyncTrial = AsyncTrialBuilder()

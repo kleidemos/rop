@@ -17,7 +17,7 @@ module Utils =
             | TrialResult.Success p -> mapping p
             | _ -> shouldNotCall ()
 
-        let shouldConvert2Of2 mapping = function 
+        let shouldConvertFailure mapping = function 
             | TrialResult.Errors p -> mapping p 
             | _ -> shouldNotCall ()
 
@@ -60,15 +60,15 @@ module Trial =
                         yield test
                             L.pow
                             Trial.warns
-                            Trial.Result.Success
+                            TrialResult.Success
                         yield test
                             L.fail
                             Trial.failsWithWarnings
-                            Trial.Result.Errors              
+                            TrialResult.Errors        
                     ]
 
                 yield test L.pow Trial.warns TrialResult.shouldConvertSuccess
-                yield test L.fail Trial.failsWithWarnings TrialResult.shouldConvert2Of2
+                yield test L.fail Trial.failsWithWarnings TrialResult.shouldConvertFailure
             ]
 
             testList "map result apart" [
@@ -186,7 +186,7 @@ module Trial =
                         string 
                         >> List.singleton
                         >> mapping
-                        |> TrialResult.shouldConvert2Of2)
+                        |> TrialResult.shouldConvertFailure)
                     |> Expect.equal "" ([string errors] |> toResult warns)
             ]
 
@@ -240,12 +240,12 @@ module Trial =
             testList "map result 2" <| nondet { 
                 let source = [   
                     L.pow, Trial.warns, TrialResult.shouldConvertSuccess
-                    L.fail, Trial.failsWithWarnings, TrialResult.shouldConvert2Of2 ]
+                    L.fail, Trial.failsWithWarnings, TrialResult.shouldConvertFailure ]
                 let! name1, factory1, way1 = source
                 let! name2, factory2, way2 = source
                 let! name3, factory3, way3 = [
-                    L.pow, Trial.warns, Trial.Result.Success
-                    L.fail, Trial.failsWithWarnings, Trial.Result.Errors]
+                    L.pow, Trial.warns, TrialResult.Success
+                    L.fail, Trial.failsWithWarnings, TrialResult.Errors]
                 return testProperty (sprintf "%s + %s -> %s" name1 name2 name3) <| fun r1 w1 r2 w2 -> 
                     (factory1 w1 r1, factory2 w2 r2)
                     ||> Trial.mapResult2 (
@@ -738,4 +738,136 @@ module TrialBuilder =
                     return counter
                 }
                 |> Expect.equal "" (Trial.pass (items |> List.sum))
+        ]
+
+
+module AsyncTrialBuilder =
+    [<Tests>]
+    let tests = 
+        testList "AsyncTrialBuilder" [
+            testList "bind" [
+                testProperty L.pow <| fun success warnings -> 
+                    asyncTrial {
+                        let! p = Trial.warns warnings success
+                        return hash p
+                    }
+                    |> Async.RunSynchronously
+                    |> Expect.equal "" (
+                        hash success
+                        |> Trial.warns warnings)
+
+                testProperty L.fail <| fun errors warnings -> 
+                    asyncTrial {
+                        let! p = Trial.failsWithWarnings warnings errors
+                        return hash p
+                    }
+                    |> Async.RunSynchronously
+                    |> Expect.equal "" (
+                        Trial.failsWithWarnings warnings errors)
+            ]
+
+            //testProperty "combine" <| fun value ->
+            //    asyncTrial {
+            //        let! f = Trial.pass ()
+            //        if value <> 42 then 
+            //            do f
+            //        return  value
+            //    }
+            //    |> Async.RunSynchronously
+            //    |> Expect.equal "" (Trial.pass value)
+
+            testList "try with" [
+                testProperty L.success <| fun value ->
+                    asyncTrial { 
+                        return 
+                            try value 
+                            with _ -> 42
+                    }
+                    |> Async.RunSynchronously
+                    |> Expect.equal "" (Trial.pass value)
+
+                testProperty L.fail <| fun value -> 
+                    asyncTrial {
+                        return 
+                            try 
+                                failwith "BOO!!!"
+                                42
+                            with _ -> value
+                    }
+                    |> Async.RunSynchronously
+                    |> Expect.equal "" (Trial.pass value)
+            ]
+
+            testList "try finally" [
+                testProperty L.success <| fun value -> 
+                    let mutable passTest = false
+                    asyncTrial {
+                        try value
+                        finally passTest <- true
+                    }
+                    |> Async.RunSynchronously
+                    |> Expect.equal "" (Trial.pass value)
+                    passTest |> Expect.isTrue ""
+
+                testCase L.fail <| fun () -> 
+                    let mutable passTest = false
+                    fun () -> 
+                        asyncTrial {
+                            try failwith "BOO!!!" 
+                            finally passTest <- true
+                        }
+                        |> Async.RunSynchronously
+                        |> shouldNotCallT
+                    |> Expect.throws ""
+                    passTest |> Expect.isTrue ""
+            ]
+
+            testList "use" [
+                testProperty L.success <| fun value -> 
+                    let mutable passTest = false
+                    asyncTrial {
+                        use! s = 
+                            { new System.IDisposable with 
+                                member this.Dispose () = passTest <- true }
+                            |> Trial.pass
+                        return value
+                    }
+                    |> Async.RunSynchronously
+                    |> Expect.equal "" (Trial.pass value)
+                    passTest |> Expect.isTrue ""
+                    
+                testCase L.fail <| fun () -> 
+                    let mutable passTest = false
+                    fun () -> 
+                        asyncTrial {
+                            use! s = 
+                                { new System.IDisposable with 
+                                    member this.Dispose () = passTest <- true }
+                                |> Trial.pass
+                            failwith "BOO!!!"
+                            return 42
+                        } 
+                        |> Async.RunSynchronously
+                        |> shouldNotCallT
+                    |> Expect.throws ""
+                    passTest |> Expect.isTrue ""
+            ]
+            //testCase "while" <| fun () -> 
+            //    asyncTrial {
+            //        let mutable counter = 0
+            //        while counter < 42 do
+            //            counter <- counter + 1 
+            //        return 42
+            //    }
+            //    |> Async.RunSynchronously
+            //    |> Expect.equal "" (Trial.pass 42)
+            //testProperty "for" <| fun items -> 
+            //    asyncTrial {
+            //        let mutable sum = 0
+            //        for item in items do sum <- sum + item
+            //        return sum
+            //    }
+            //    |> Async.RunSynchronously
+            //    |> Expect.equal "" (Trial.pass (items |> List.sum))
+                
         ]
