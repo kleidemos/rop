@@ -43,6 +43,8 @@ type Trial<'result, 'warning, 'error> = {
 }    
 
 module Trial =                         
+    let (|T|) (trial : Trial<_,_,_>) = trial
+
     let (|Success|Failure|) trial = 
         match trial.Result with
         | TrialResult.Success p -> Success (p, trial.Warnings)
@@ -462,6 +464,11 @@ module AsyncTrial =
             return Trial.createFailure warnings errors
     }
 
+    let ofAsync async' : AsyncTrial<'a,'b,'c> = async {
+        let! res = async'
+        return Trial.pass res
+    }
+
     let bind binding (T trial) : AsyncTrial<_,_,_> = async {
         let! trial = trial            
         let! preResult = 
@@ -500,9 +507,9 @@ module AsyncTrialBuilder =
         member this.Bind (trial, binding : 'd -> _) : AsyncTrial<'a,'b,'c> = 
             async.Return trial
             |> AsyncTrial.bind binding
-        member this.Bind (async', binding : 'd -> _) : AsyncTrial<'a,'b,'c> = 
-            async.Bind(async', Trial.pass >> async.Return)
-            |> AsyncTrial.bind binding
+        //member this.Bind (async', binding : 'd -> _) : AsyncTrial<'a,'b,'c> = 
+        //    async.Bind(async', Trial.pass >> async.Return)
+        //    |> AsyncTrial.bind binding
         member this.Combine (a : AsyncTrial<unit,'b,'c>, b) : AsyncTrial<'a,'b,'c> = 
             AsyncTrial.bind (fun () -> b) a
         member this.TryWith (AsyncTrial.T trial, handler) : AsyncTrial<'a,'b,'c> = 

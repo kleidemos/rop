@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Trial.Tests.fs" />
+    <Compile Include="Trial.Hopac.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

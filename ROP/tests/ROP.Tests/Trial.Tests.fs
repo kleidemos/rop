@@ -754,29 +754,27 @@ module TrialBuilder =
         ]
 
 
+// TODO: Большинство тестов не использует async.
 module AsyncTrialBuilder =
     [<Tests>]
     let tests = 
         testList "AsyncTrialBuilder" [
             testList "bind" [
-                testProperty L.pow <| fun success warnings -> 
+                testProperty "AsyncTrial" <| fun (Trial.T trial) -> 
                     asyncTrial {
-                        let! p = Trial.createSuccess warnings success
+                        let! p = async.Return trial
                         return hash p
                     }
                     |> Async.RunSynchronously
-                    |> Expect.equal "" (
-                        hash success
-                        |> Trial.createSuccess warnings)
-
-                testProperty L.fail <| fun errors warnings -> 
+                    |> Expect.equal "" (trial |> Trial.map hash)
+                
+                testProperty "Trial" <| fun (Trial.T trial) -> 
                     asyncTrial {
-                        let! p = Trial.createFailure warnings errors
+                        let! p = trial
                         return hash p
                     }
                     |> Async.RunSynchronously
-                    |> Expect.equal "" (
-                        Trial.createFailure warnings errors)
+                    |> Expect.equal "" (trial |> Trial.map hash)
             ]
 
             testProperty "combine" <| fun value ->
@@ -815,7 +813,7 @@ module AsyncTrialBuilder =
                 testProperty L.success <| fun value -> 
                     let mutable passTest = false
                     asyncTrial {
-                        try value
+                        try return value
                         finally passTest <- true
                     }
                     |> Async.RunSynchronously
@@ -860,8 +858,8 @@ module AsyncTrialBuilder =
                             failwith "BOO!!!"
                             return 42
                         } 
+                        |> Async.Ignore
                         |> Async.RunSynchronously
-                        |> shouldNotCallT
                     |> Expect.throws ""
                     passTest |> Expect.isTrue ""
             ]
@@ -874,6 +872,7 @@ module AsyncTrialBuilder =
                 }
                 |> Async.RunSynchronously
                 |> Expect.equal "" (Trial.pass 42)
+            
             testProperty "for" <| fun items -> 
                 asyncTrial {
                     let mutable sum = 0
